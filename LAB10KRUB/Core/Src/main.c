@@ -53,25 +53,36 @@ UART_HandleTypeDef huart2;
 /* USER CODE BEGIN PV */
 uint16_t ADCin = 0;
 uint64_t _micro = 0;
-uint16_t bitvoltuint = 0;
+float bitvoltuint = 0;
+float bitvoltuint1 = 0;
+uint16_t good = 0;
 //12bit ของ dac
 uint16_t dataOut = 0;
 uint8_t DACConfig = 0b0011;
 uint64_t timestamp = 0;
+uint64_t timestamp1 = 0;
+uint64_t timestamp2 = 0;
+
+
+float AngleInput =0;
+float SineOutput =0;
+double ChangeRate =0.0015;
+float OutputAmp = 0;
 
 float A = 0;
 float t = 0;
 float bitvolt = 0;
-float hz = 0.1;
+float hz = 1;
 float sawtooth = 0;
-float vhigh = 2;
-float vlow = 1;
+float vhigh = 3.3;
+float vlow = 0;
 float bitvhigh = 0;
 float bitvlow = 0;
 float slopeup = 0;
 float slopedown = 1;
 float sinewave = 1;
 float dcgain = 0;
+float squarewave = 0;
 //ใน datasheet สิ่งที่เปลี่ยนคือ d0-d12
 /* USER CODE END PV */
 
@@ -189,27 +200,74 @@ int main(void)
 
 						 }
 				}
+				else if(hz == 0)
+				{
 
-	    }
-	    else if(sinewave == 1)
-	    {
-	    		if (micros() - timestamp > ( (250/hz)*(4095/(bitvhigh-bitvlow)) )     )
-	    		{
-	    			  timestamp = micros();
-	    			  t = micros();
-					  A = 4095/2;
-					  dcgain = (4095/2);
-					  bitvolt = A*sin(2*(M_PI)*hz*t)+dcgain;
-					  bitvoltuint = bitvolt;
-					  dataOut = bitvoltuint;
 					  if (hspi3.State == HAL_SPI_STATE_READY
 									 && HAL_GPIO_ReadPin(SPI_SS_GPIO_Port, SPI_SS_Pin)
 											 == GPIO_PIN_SET)
 					  {
 							 MCP4922SetOutput(DACConfig, dataOut);
 					  }
-	    		}
+				}
+
 	    }
+	    else if(sinewave == 1)
+	    {
+	    		if(hz > 0)
+	    		{
+	    				if (micros() - timestamp1 >  (250/hz) )
+						{
+							  timestamp1 = micros();
+							  //t = micros();
+							 // A = 4095/2;
+							 //dcgain = (4095/2);
+							  OutputAmp = (bitvhigh-bitvlow)/2;
+							  AngleInput += ChangeRate;
+							  if (AngleInput > 2*M_PI)
+							  {
+									  AngleInput -= 2*M_PI;
+							  }
+							  else if (AngleInput < 0)
+							  {
+									  AngleInput += 2*M_PI;
+							  }
+
+
+							  SineOutput = OutputAmp*sin(AngleInput)+((bitvhigh+bitvlow)/2);
+							//  bitvolt = A*sin(2*(M_PI)*hz*t)+dcgain;
+							//  bitvoltuint = bitvolt;
+							  bitvoltuint1 = SineOutput;
+
+							  dataOut = bitvoltuint1;
+							  if (hspi3.State == HAL_SPI_STATE_READY
+											 && HAL_GPIO_ReadPin(SPI_SS_GPIO_Port, SPI_SS_Pin)
+													 == GPIO_PIN_SET)
+							  {
+									 MCP4922SetOutput(DACConfig, dataOut);
+							  }
+						}
+	    		}
+				else if(hz == 0)
+				{
+
+					  if (hspi3.State == HAL_SPI_STATE_READY
+									 && HAL_GPIO_ReadPin(SPI_SS_GPIO_Port, SPI_SS_Pin)
+											 == GPIO_PIN_SET)
+					  {
+							 MCP4922SetOutput(DACConfig, dataOut);
+					  }
+				}
+
+	    }
+//	    else if(squarewave == 1)
+//	    {
+//					if (micros() - timestamp2 >  (250/hz) )
+//					{
+//							timestamp2 = micros();
+//
+//					}
+//	    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
