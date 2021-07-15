@@ -23,6 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <math.h>
+#include <stdio.h>   //sprintf
+#include <string.h>   //strlen
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,7 +65,7 @@ uint64_t timestamp = 0;
 uint64_t timestamp1 = 0;
 uint64_t timestamp2 = 0;
 
-
+float dutycycle = 0;
 float AngleInput =0;
 float SineOutput =0;
 double ChangeRate =0.0015;
@@ -72,10 +74,10 @@ float OutputAmp = 0;
 float A = 0;
 float t = 0;
 float bitvolt = 0;
-float hz = 1;
+float hz = 3;
 float sawtooth = 0;
-float vhigh = 3.3;
-float vlow = 0;
+float vhigh = 1;
+float vlow = 0.5;
 float bitvhigh = 0;
 float bitvlow = 0;
 float slopeup = 0;
@@ -83,6 +85,11 @@ float slopedown = 1;
 float sinewave = 1;
 float dcgain = 0;
 float squarewave = 0;
+
+char TxDataBuffer[32] =
+{ 0 };
+char RxDataBuffer[32] =
+{ 0 };
 //ใน datasheet สิ่งที่เปลี่ยนคือ d0-d12
 /* USER CODE END PV */
 
@@ -98,6 +105,8 @@ static void MX_TIM11_Init(void);
 /* USER CODE BEGIN PFP */
 void MCP4922SetOutput(uint8_t Config, uint16_t DACOutput);
 uint64_t micros();
+void UARTRecieveAndResponsePolling();
+int16_t UARTRecieveIT();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -151,7 +160,20 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	    bitvhigh = ((4095*vhigh)/3.3);
+
+
+	  	HAL_UART_Receive_IT(&huart2,  (uint8_t*)RxDataBuffer, 32);
+
+
+		if(inputchar!=-1)
+  		{
+
+  			sprintf(TxDataBuffer, "ReceivedChar:[%c]\r\n", inputchar);
+  			HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+  		}
+
+
+		bitvhigh = ((4095*vhigh)/3.3);
 	    bitvlow = ((4095*vlow)/3.3);
 	    if(sawtooth == 1)
 	    {
@@ -265,6 +287,7 @@ int main(void)
 //					if (micros() - timestamp2 >  (250/hz) )
 //					{
 //							timestamp2 = micros();
+//							if
 //
 //					}
 //	    }
@@ -604,6 +627,45 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 		HAL_GPIO_WritePin(SPI_SS_GPIO_Port, SPI_SS_Pin, GPIO_PIN_SET);
 	}
 }
+
+
+void UARTRecieveAndResponsePolling() //function ส่งอะไรมาเเล้วรับอะไรไป
+{
+	char Recieve[32]={0};
+//Received ตามไฟกระพริบของ LD2ด้วย ไฟติด received ไฟดับ received เเละใน received สามารถกดเเป้น key พิมพ์ได้
+	HAL_UART_Receive(&huart2, (uint8_t*)Recieve, 4, 1000);
+//ส่งกลับไป
+	//ถ้ากำหนดหลัง receive เป็น 4 เเปลว่าถ้าเรากดเเป้นพิมครบ 4 ตัวมันจะออกจาก function ทันทีเเละเเต่ละอันที่มัน received จะไม่มีทางเกิน 4 ถ้ายังกดไม่ครบ 4 ตัว มันจะ
+	//receive ความเร็วตามปกติ เนื่องจากมันยังรอตัวอักษรที่ป้อนเข้าไป เเต่ ถ้าครบเเล้วมันจะออกจาก function ทันที มันจะขึ้น received เร็วมาก
+	sprintf(TxDataBuffer, "Received:[%s]\r\n", Recieve);
+	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+//คือตัว printf มัน print ลงในตัวเเปรซักตัวเเปรนึง
+	//print ไว้ใน databuffer ซึ่งมันเป็น global
+}
+
+
+int16_t UARTRecieveIT()
+{
+	static uint32_t dataPos =0;
+	//ประกาศให้ตัวเเปรนี้รักษาค่าเดิมเอาไว้
+	int16_t data=-1;
+	if(huart2.RxXferSize - huart2.RxXferCount!=dataPos)
+	{
+		//เพื่อให้ได้ตำเเหน่งของข้อมูล
+		data=RxDataBuffer[dataPos];
+		dataPos= (dataPos+1)%huart2.RxXferSize;
+	}
+	return data;
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	sprintf(TxDataBuffer, "Received:[%s]\r\n", RxDataBuffer);
+	//HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+	HAL_UART_Transmit_IT(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer));
+	//functionนี้คือจะไม่ขึ้น receive จนกว่าจะใส่ข้อมูลครบ ถ้าเรากำหนดขนาด 32  มันจะ received ก็ต่อเมื่อมันครบ 32
+}
+
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
