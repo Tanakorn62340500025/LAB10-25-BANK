@@ -90,6 +90,21 @@ char TxDataBuffer[32] =
 { 0 };
 char RxDataBuffer[32] =
 { 0 };
+
+enum state
+{
+	mainmenu = 0,
+	mainmenuwait,
+	sawtoothmenu,
+	sawtoothmenuwait,
+	sinewavemenu,
+	sinewavemenuwait,
+	squarewavemenu,
+	squarewavemenuwait,
+
+};
+
+uint8_t state = mainmenu;
 //ใน datasheet สิ่งที่เปลี่ยนคือ d0-d12
 /* USER CODE END PV */
 
@@ -164,7 +179,7 @@ int main(void)
 
 	  	HAL_UART_Receive_IT(&huart2,  (uint8_t*)RxDataBuffer, 32);
 
-
+  		int16_t inputchar = UARTRecieveIT();
 		if(inputchar!=-1)
   		{
 
@@ -291,6 +306,32 @@ int main(void)
 //
 //					}
 //	    }
+
+
+	    switch(state)
+	    {
+	    		case mainmenu:
+						sprintf(TxDataBuffer, "Please choose type of the wave\r\n0:Sawtooth\r\n1:Sine wave\r\n2:Square wave\r\n", inputchar);
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = mainmenuwait;
+						break;
+	    		case mainmenuwait:
+						switch(inputchar)
+						{
+	  							case '0':
+
+	  								break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+
+						}
+						break;
+
+	    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -371,8 +412,8 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T3_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
     Error_Handler();
@@ -415,7 +456,7 @@ static void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -449,7 +490,7 @@ static void MX_TIM3_Init(void)
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 100;
+  htim3.Init.Prescaler = 99;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim3.Init.Period = 100;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -491,7 +532,7 @@ static void MX_TIM11_Init(void)
 
   /* USER CODE END TIM11_Init 1 */
   htim11.Instance = TIM11;
-  htim11.Init.Prescaler = 100;
+  htim11.Init.Prescaler = 99;
   htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim11.Init.Period = 65535;
   htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -632,14 +673,14 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 void UARTRecieveAndResponsePolling() //function ส่งอะไรมาเเล้วรับอะไรไป
 {
 	char Recieve[32]={0};
-//Received ตามไฟกระพริบของ LD2ด้วย ไฟติด received ไฟดับ received เเละใน received สามารถกดเเป้น key พิมพ์ได้
+//Received ตามไฟ�?ระพริบของ LD2ด้วย ไฟติด received ไฟดับ received เเละใน received สามารถ�?ดเเป้น key พิมพ์ได้
 	HAL_UART_Receive(&huart2, (uint8_t*)Recieve, 4, 1000);
-//ส่งกลับไป
-	//ถ้ากำหนดหลัง receive เป็น 4 เเปลว่าถ้าเรากดเเป้นพิมครบ 4 ตัวมันจะออกจาก function ทันทีเเละเเต่ละอันที่มัน received จะไม่มีทางเกิน 4 ถ้ายังกดไม่ครบ 4 ตัว มันจะ
-	//receive ความเร็วตามปกติ เนื่องจากมันยังรอตัวอักษรที่ป้อนเข้าไป เเต่ ถ้าครบเเล้วมันจะออกจาก function ทันที มันจะขึ้น received เร็วมาก
+//ส่ง�?ลับไป
+	//ถ้า�?ำหนดหลัง receive เป็น 4 เเปลว่าถ้าเรา�?ดเเป้นพิมครบ 4 ตัวมันจะออ�?จา�? function ทันทีเเละเเต่ละอันที่มัน received จะไม่มีทางเ�?ิน 4 ถ้ายัง�?ดไม่ครบ 4 ตัว มันจะ
+	//receive ความเร็วตามป�?ติ เนื่องจา�?มันยังรอตัวอั�?ษรที่ป้อนเข้าไป เเต่ ถ้าครบเเล้วมันจะออ�?จา�? function ทันที มันจะขึ้น received เร็วมา�?
 	sprintf(TxDataBuffer, "Received:[%s]\r\n", Recieve);
 	HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
-//คือตัว printf มัน print ลงในตัวเเปรซักตัวเเปรนึง
+//คือตัว printf มัน print ลงในตัวเเปรซั�?ตัวเเปรนึง
 	//print ไว้ใน databuffer ซึ่งมันเป็น global
 }
 
@@ -647,7 +688,7 @@ void UARTRecieveAndResponsePolling() //function ส่งอะไรมาเ�
 int16_t UARTRecieveIT()
 {
 	static uint32_t dataPos =0;
-	//ประกาศให้ตัวเเปรนี้รักษาค่าเดิมเอาไว้
+	//ประ�?าศให้ตัวเเปรนี้รั�?ษาค่าเดิมเอาไว้
 	int16_t data=-1;
 	if(huart2.RxXferSize - huart2.RxXferCount!=dataPos)
 	{
@@ -663,7 +704,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 	sprintf(TxDataBuffer, "Received:[%s]\r\n", RxDataBuffer);
 	//HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 	HAL_UART_Transmit_IT(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer));
-	//functionนี้คือจะไม่ขึ้น receive จนกว่าจะใส่ข้อมูลครบ ถ้าเรากำหนดขนาด 32  มันจะ received ก็ต่อเมื่อมันครบ 32
+	//functionนี้คือจะไม่ขึ้น receive จน�?ว่าจะใส่ข้อมูลครบ ถ้าเรา�?ำหนดขนาด 32  มันจะ received �?็ต่อเมื่อมันครบ 32
 }
 
 
