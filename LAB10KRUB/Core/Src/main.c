@@ -101,6 +101,11 @@ enum state
 	sinewavemenuwait,
 	squarewavemenu,
 	squarewavemenuwait,
+	frequencymenu,
+	vhighmenu,
+	vlowmenu,
+	slopemenu,
+
 
 };
 
@@ -311,15 +316,28 @@ int main(void)
 	    switch(state)
 	    {
 	    		case mainmenu:
-						sprintf(TxDataBuffer, "Please choose type of the wave\r\n0:Sawtooth\r\n1:Sine wave\r\n2:Square wave\r\n", inputchar);
+						sprintf(TxDataBuffer, "Please select type of the wave\r\n0:Sawtooth\r\n1:Sine wave\r\n2:Square wave\r\nx:back to previous\r\nq:back to Main Menu\r\n", inputchar);
 						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 						state = mainmenuwait;
 						break;
+
 	    		case mainmenuwait:
 						switch(inputchar)
 						{
 	  							case '0':
-
+	  								state = sawtoothmenu;
+	  								break;
+	  							case '1':
+	  								state = sinewavemenu;
+	  								break;
+	  							case '2':
+	  								state = squarewavemenu;
+	  								break;
+	  							case 'x':
+	  								state = mainmenu;
+	  								break;
+	  							case 'q':
+	  								state = mainmenu;
 	  								break;
 								case -1:
 									break;
@@ -327,9 +345,42 @@ int main(void)
 									sprintf(TxDataBuffer, "Wrong\r\n");
 									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 									break;
-
 						}
 						break;
+
+				case sawtoothmenu:
+						sprintf(TxDataBuffer, "Please select sawtooth variable\r\nf:frequency\r\nh:v high\r\nl:v low\r\ns:slope up/down\r\nx:back to previous\r\nq:back to Main Menu\r\n", inputchar);
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = sawtoothmenuwait;
+						break;
+
+				case sawtoothmenuwait:
+						switch(inputchar)
+						{
+								case 'f':
+									state = frequencymenu;
+									break;
+								case 'h':
+									state = vhighmenu;
+									break;
+								case 'l':
+									state = vlowmenu;
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case 'q':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
+
 
 	    }
     /* USER CODE END WHILE */
