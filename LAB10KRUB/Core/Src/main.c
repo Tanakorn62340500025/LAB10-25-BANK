@@ -57,34 +57,34 @@ uint16_t ADCin = 0;
 uint64_t _micro = 0;
 float bitvoltuint = 0;
 float bitvoltuint1 = 0;
-uint16_t good = 0;
 //12bit ของ dac
 uint16_t dataOut = 0;
 uint8_t DACConfig = 0b0011;
 uint64_t timestamp = 0;
 uint64_t timestamp1 = 0;
 uint64_t timestamp2 = 0;
-
+float a = 0;
 float dutycycle = 0;
+float squarecheck = 0;
+
 float AngleInput =0;
 float SineOutput =0;
 double ChangeRate =0.0015;
 float OutputAmp = 0;
 
-float A = 0;
-float t = 0;
+
 float bitvolt = 0;
-float hz = 3;
+float hz = 1;
 float sawtooth = 0;
-float vhigh = 1;
-float vlow = 0.5;
+float vhigh = 3.3;
+float vlow = 0;
 float bitvhigh = 0;
 float bitvlow = 0;
-float slopeup = 0;
-float slopedown = 1;
+float slopeup = 1;
+float slopedown = 0;
 float sinewave = 1;
-float dcgain = 0;
 float squarewave = 0;
+float hzzero = 0;
 
 char TxDataBuffer[32] =
 { 0 };
@@ -102,9 +102,15 @@ enum state
 	squarewavemenu,
 	squarewavemenuwait,
 	frequencymenu,
+	frequencymenuwait,
 	vhighmenu,
+	vhighmenuwait,
 	vlowmenu,
+	vlowmenuwait,
 	slopemenu,
+	slopemenuwait,
+	dutycyclemenu,
+	dutycyclemenuwait,
 
 
 };
@@ -199,14 +205,16 @@ int main(void)
 	    {
 				if(hz > 0)
 				{
+
 						//static uint64_t timestamp = 0;
-						if (micros() - timestamp > ( (250/hz)*(4095/(bitvhigh-bitvlow)) )     ) //100us = 10khz
+						if (micros() - timestamp > 100) //100us = 10khz
 						{
 								timestamp = micros();
+								a += 0.0001;
 								if(slopeup == 1)
 								{
 
-										 bitvolt++;
+										 bitvolt+=((bitvhigh-bitvlow)*hz)/10000;
 										 if(bitvolt >= bitvhigh)
 										 {
 											 bitvolt = bitvlow;
@@ -223,8 +231,7 @@ int main(void)
 								  }
 								  else if(slopedown == 1)
 								  {
-
-										  bitvolt--;
+									  	  bitvolt-=((bitvhigh-bitvlow)*hz)/10000;
 										  if(bitvolt <= bitvlow)
 										  {
 											  bitvolt = bitvhigh;
@@ -242,23 +249,14 @@ int main(void)
 
 						 }
 				}
-				else if(hz == 0)
-				{
 
-					  if (hspi3.State == HAL_SPI_STATE_READY
-									 && HAL_GPIO_ReadPin(SPI_SS_GPIO_Port, SPI_SS_Pin)
-											 == GPIO_PIN_SET)
-					  {
-							 MCP4922SetOutput(DACConfig, dataOut);
-					  }
-				}
 
 	    }
 	    else if(sinewave == 1)
 	    {
-	    		if(hz > 0)
+				if(hz > 0)
 	    		{
-	    				if (micros() - timestamp1 >  (250/hz) )
+	    				if (micros() - timestamp1 >  100 )
 						{
 							  timestamp1 = micros();
 							  //t = micros();
@@ -276,7 +274,7 @@ int main(void)
 							  }
 
 
-							  SineOutput = OutputAmp*sin(AngleInput)+((bitvhigh+bitvlow)/2);
+							  SineOutput = OutputAmp*sin(2*(M_PI)*hz*(timestamp1-timestamp)/1000000.0)+((bitvhigh+bitvlow)/2);
 							//  bitvolt = A*sin(2*(M_PI)*hz*t)+dcgain;
 							//  bitvoltuint = bitvolt;
 							  bitvoltuint1 = SineOutput;
@@ -290,53 +288,71 @@ int main(void)
 							  }
 						}
 	    		}
-				else if(hz == 0)
-				{
 
-					  if (hspi3.State == HAL_SPI_STATE_READY
-									 && HAL_GPIO_ReadPin(SPI_SS_GPIO_Port, SPI_SS_Pin)
-											 == GPIO_PIN_SET)
-					  {
-							 MCP4922SetOutput(DACConfig, dataOut);
-					  }
-				}
 
 	    }
-//	    else if(squarewave == 1)
-//	    {
-//					if (micros() - timestamp2 >  (250/hz) )
-//					{
-//							timestamp2 = micros();
-//							if
-//
-//					}
-//	    }
+	    else if(squarewave == 1)
+	    {
+	    		if(hz > 0)
+	    		{
+	    					if (micros() - timestamp2 > (1/hz)*(dutycycle/100.0)*1000000 && squarecheck == 1)
+							{
+									timestamp2 = micros();
+									dataOut = bitvlow;
+									squarecheck = 0;
+							}
+							else if (micros() - timestamp2 > (1/hz)*((100-dutycycle)/100.0)*1000000 && squarecheck == 0)
+							{
+									timestamp2 = micros();
+									dataOut = bitvhigh;
+									squarecheck = 1;
+							}
+							  if (hspi3.State == HAL_SPI_STATE_READY
+											 && HAL_GPIO_ReadPin(SPI_SS_GPIO_Port, SPI_SS_Pin)
+													 == GPIO_PIN_SET)
+							  {
+									 MCP4922SetOutput(DACConfig, dataOut);
+							  }
+
+	    		}
+
+	    }
+
 
 
 	    switch(state)
 	    {
 	    		case mainmenu:
-						sprintf(TxDataBuffer, "Please select type of the wave\r\n0:Sawtooth\r\n1:Sine wave\r\n2:Square wave\r\nx:back to previous\r\nq:back to Main Menu\r\n", inputchar);
-						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+	  					sprintf(TxDataBuffer, "Main Menu\r\n0:Sawtooth\r\n1:Sine wave\r\n2:Square wave\r\nx:back\r\n");
+	  					HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 						state = mainmenuwait;
-						break;
+	    				break;
+
 
 	    		case mainmenuwait:
 						switch(inputchar)
 						{
 	  							case '0':
+	  								sawtooth = 1;
+	  								sinewave = 0;
+	  								squarewave = 0;
 	  								state = sawtoothmenu;
 	  								break;
 	  							case '1':
+	  								sawtooth = 0;
+	  								sinewave = 1;
+	  								squarewave = 0;
+	  								timestamp = micros();   //เวลาเเรกสุดของการ gen sine
 	  								state = sinewavemenu;
 	  								break;
 	  							case '2':
+	  								sawtooth = 0;
+	  								sinewave = 0;
+	  								squarewave = 1;
+	  								timestamp2 = micros();
 	  								state = squarewavemenu;
 	  								break;
 	  							case 'x':
-	  								state = mainmenu;
-	  								break;
-	  							case 'q':
 	  								state = mainmenu;
 	  								break;
 								case -1:
@@ -349,7 +365,7 @@ int main(void)
 						break;
 
 				case sawtoothmenu:
-						sprintf(TxDataBuffer, "Please select sawtooth variable\r\nf:frequency\r\nh:v high\r\nl:v low\r\ns:slope up/down\r\nx:back to previous\r\nq:back to Main Menu\r\n", inputchar);
+						sprintf(TxDataBuffer, "sawtooth\r\nf:frequency\r\nh:vhigh\r\nl:vlow\r\ns:slopeup/down\r\nx:back\r\n");
 						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
 						state = sawtoothmenuwait;
 						break;
@@ -366,10 +382,10 @@ int main(void)
 								case 'l':
 									state = vlowmenu;
 									break;
-								case 'x':
-									state = mainmenu;
+								case 's':
+									state = slopemenu;
 									break;
-								case 'q':
+								case 'x':
 									state = mainmenu;
 									break;
 								case -1:
@@ -381,8 +397,246 @@ int main(void)
 						}
 						break;
 
+				case sinewavemenu:
+						sprintf(TxDataBuffer, "sinewave\r\nf:frequency\r\nh:vhigh\r\nl:vlow\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = sinewavemenuwait;
+						break;
+				case sinewavemenuwait:
+						switch(inputchar)
+						{
+								case 'f':
+									state = frequencymenu;
+									break;
+								case 'h':
+									state = vhighmenu;
+									break;
+								case 'l':
+									state = vlowmenu;
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
 
-	    }
+				case squarewavemenu:
+						sprintf(TxDataBuffer, "square\r\nf:frequency\r\nh:vhigh\r\nl:vlow\r\nd:dutycycle\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = squarewavemenuwait;
+						break;
+
+				case squarewavemenuwait:
+						switch(inputchar)
+						{
+								case 'f':
+									state = frequencymenu;
+									break;
+								case 'h':
+									state = vhighmenu;
+									break;
+								case 'l':
+									state = vlowmenu;
+									break;
+								case 'd':
+									state = dutycyclemenu;
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
+
+				case frequencymenu:
+						sprintf(TxDataBuffer, "frequency\r\n+:add\r\n-:minus\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = frequencymenuwait;
+						break;
+
+				case frequencymenuwait:
+						switch(inputchar)
+						{
+								case '+':
+									if(hz < 10)
+									{
+										hz += 0.1;
+									}
+									break;
+								case '-':
+									if(hz > 0)
+									{
+										hz -= 0.1;
+									}
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
+
+				case vhighmenu:
+						sprintf(TxDataBuffer, "vhigh\r\n+:add\r\n-:minus\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = vhighmenuwait;
+						break;
+				case vhighmenuwait:
+						switch(inputchar)
+						{
+								case '+':
+									if(vhigh < 3.3)
+									{
+										vhigh += 0.1;
+									}
+									if(vhigh > 3.3)
+									{
+										vhigh = 3.3;
+									}
+									break;
+								case '-':
+									if(vhigh >= vlow)
+									{
+										if(vhigh > 0)
+										{
+											vhigh -= 0.1;
+										}
+									}
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
+
+				case vlowmenu:
+						sprintf(TxDataBuffer, "vlow\r\n+:add\r\n-:minus\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = vlowmenuwait;
+						break;
+				case vlowmenuwait:
+						switch(inputchar)
+						{
+										case '+':
+											if(vlow <= vhigh)
+											{
+												if(vlow < 3.3)
+												{
+													vlow += 0.1;
+												}
+											}
+											break;
+										case '-':
+											if(vlow > 0)
+											{
+												vlow -= 0.1;
+											}
+											if(vlow < 0)
+											{
+												vlow = 0;
+											}
+											break;
+										case 'x':
+											state = mainmenu;
+											break;
+										case -1:
+											break;
+										default:
+											sprintf(TxDataBuffer, "Wrong\r\n");
+											HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+											break;
+						}
+						break;
+
+				case slopemenu:
+						sprintf(TxDataBuffer, "slope\r\n0:slopedown\r\n1:slopeup\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = slopemenuwait;
+						break;
+
+				case slopemenuwait:
+						switch(inputchar)
+						{
+								case '1':
+									slopedown = 0;
+									slopeup = 1;
+									break;
+								case '0':
+									slopeup = 0;
+									slopedown = 1;
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
+
+				case dutycyclemenu:
+						sprintf(TxDataBuffer, "dutycycle\r\n+:add\r\n-:minus\r\nx:back\r\n");
+						HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+						state = dutycyclemenuwait;
+						break;
+				case dutycyclemenuwait:
+						switch(inputchar)
+						{
+								case '+':
+									if(dutycycle < 100)
+									{
+										dutycycle += 10;
+									}
+									break;
+								case '-':
+									if(dutycycle > 0)
+									{
+										dutycycle -= 10;
+									}
+									break;
+								case 'x':
+									state = mainmenu;
+									break;
+								case -1:
+									break;
+								default:
+									sprintf(TxDataBuffer, "Wrong\r\n");
+									HAL_UART_Transmit(&huart2, (uint8_t*)TxDataBuffer, strlen(TxDataBuffer), 1000);
+									break;
+						}
+						break;
+
+//						case vhighmenu:
+
+
+
+
+	   }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -463,7 +717,7 @@ static void MX_ADC1_Init(void)
   hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T3_TRGO;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
   {
